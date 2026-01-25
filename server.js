@@ -1,4 +1,33 @@
 
+require("dotenv").config()
+
+const express = require("express")
+const mongoose = require("mongoose")
+
+const app = express()
+
+// 🔥 MANUAL CORS – 100% GUARANTEED
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*")
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  )
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  )
+
+  // 🔥 preflight request stop here
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200)
+  }
+
+  next()
+})
+
+app.use(express.json())
+app.use("/uploads", express.static("uploads"))
 
 
 // ================= MONGO =================
@@ -355,6 +384,4 @@ app.get("/marks/student", async (req, res) => {
 
 
 // ================= START SERVER =================
-app.listen(3000, () => {
-  console.log("🚀 Server running http://localhost:3000")
-})
+
