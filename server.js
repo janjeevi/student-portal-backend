@@ -1,12 +1,39 @@
+// ================= LOAD ENV =================
+require("dotenv").config()
+
+// ================= IMPORTS =================
+const express = require("express")
+const mongoose = require("mongoose")
+const cors = require("cors")
+const multer = require("multer")
+const path = require("path")
+
+// ================= APP =================
+const app = express()
+
+// ================= MIDDLEWARE =================
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://student-portal-frontend-mu.vercel.app"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}))
+
+app.options("*", cors())
+
+app.use(express.json())
+app.use("/uploads", express.static("uploads"))
+console.log("🔥 server.js loaded")
+
+// ================= MONGO CONNECT =================
+console.log("MONGO_URI =", process.env.MONGO_URI)
 
 
-// ================= MONGO =================
-mongoose
-  mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ Mongo connected"))
-  .catch(err => console.log("❌ Mongo error", err))
 
-// ================= MODELS =================
+// ================= MODELS (AFTER mongoose require) =================
 const Student = mongoose.model(
   "Student",
   new mongoose.Schema({
@@ -16,6 +43,55 @@ const Student = mongoose.model(
     password: String
   })
 )
+
+// ================= TEST =================
+app.get("/ping", (req, res) => {
+  console.log("Ping hit")
+  res.send("PONG")
+})
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ Mongo connected"))
+  .catch(err => console.log("❌ Mongo error", err))
+
+// server start
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => {
+  console.log("🚀 Server running on port", PORT)
+})
+
+// ================= LOGIN =================
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body
+
+  // ADMIN
+  if (username === "admin" && password === "admin123") {
+    return res.json({ success: true, role: "admin" })
+  }
+
+  // STUDENT
+  const student = await Student.findOne({
+    regNo: username,
+    password
+  })
+
+  if (!student) {
+    return res.json({ success: false })
+  }
+
+  res.json({
+    success: true,
+    role: "student",
+    regNo: student.regNo,
+    className: student.className,
+    name: student.name
+  })
+})
+
+// ================= START SERVER =================
+
+
 
 const Attendance = mongoose.model(
   "Attendance",
@@ -64,8 +140,10 @@ const Mark = mongoose.model(
 )
 
 
-const multer = require("multer")
-const path = require("path")
+
+
+
+
 
 const File = mongoose.model(
   "File",
@@ -75,6 +153,8 @@ const File = mongoose.model(
     fileUrl: String
   })
 )
+
+
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -129,9 +209,18 @@ app.get("/classes", async (req, res) => {
 // ================= STUDENTS BY CLASS =================
 app.get("/students", async (req, res) => {
   const { className } = req.query
-  const students = await Student.find({ className })
+
+  let students = []
+
+  if (!className || className === "ALL") {
+    students = await Student.find()
+  } else {
+    students = await Student.find({ className })
+  }
+
   res.json(students)
 })
+
 
 // ================= ATTENDANCE =================
 app.post("/attendance", async (req, res) => {
@@ -353,10 +442,4 @@ app.get("/marks/student", async (req, res) => {
 })
 
 
-// ================= START SERVER =================
-const PORT = process.env.PORT || 3000
-
-app.listen(PORT, () => {
-  console.log("Server running on port", PORT)
-})
 
