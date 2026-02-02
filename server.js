@@ -31,8 +31,6 @@ console.log("🔥 server.js loaded")
 // ================= MONGO CONNECT =================
 console.log("MONGO_URI =", process.env.MONGO_URI)
 
-
-
 // ================= MODELS (AFTER mongoose require) =================
 const Student = mongoose.model(
   "Student",
@@ -54,12 +52,6 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ Mongo connected"))
   .catch(err => console.log("❌ Mongo error", err))
-
-// server start
-const PORT = process.env.PORT || 3000
-app.listen(PORT, () => {
-  console.log("🚀 Server running on port", PORT)
-})
 
 // ================= LOGIN =================
 app.post("/login", async (req, res) => {
@@ -138,12 +130,6 @@ const Mark = mongoose.model(
     total: Number
   })
 )
-
-
-
-
-
-
 
 const File = mongoose.model(
   "File",
