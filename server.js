@@ -6,6 +6,10 @@ const express = require("express")
 const mongoose = require("mongoose")
 const cors = require("cors")
 const upload = require("./middleware/upload")
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../utils/cloudinary");
+
 
 // ================= CLOUDINARY =================
 
@@ -321,16 +325,17 @@ app.get("/events", async (req, res) => {
 // ================= FILE UPLOAD (ADMIN) =================
 app.post("/files/upload", upload.single("file"), async (req, res) => {
   try {
-    if (!req.file || !req.body.title || !req.body.className) {
-      return res.status(400).json({ success: false })
-    }
+    console.log("FILE =", req.file)
+    console.log("BODY =", req.body)
 
-   
+    if (!req.file) {
+      return res.status(400).json({ error: "File missing" })
+    }
 
     await File.create({
       title: req.body.title,
       className: req.body.className,
-      fileUrl: uploadResult.secure_url
+      fileUrl: req.file.path   // 👈 cloudinary URL
     })
 
     res.json({ success: true })
