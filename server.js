@@ -150,6 +150,19 @@ const File = mongoose.model(
 )
 
 
+const cloudinary = require("cloudinary").v2
+const multer = require("multer")
+const { CloudinaryStorage } = require("multer-storage-cloudinary")
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "student-portal",
+    allowed_formats: ["jpg", "png", "pdf"]
+  }
+})
+
+const upload = multer({ storage })
 
 
 
@@ -323,27 +336,7 @@ app.get("/events", async (req, res) => {
 })
 
 // ================= FILE UPLOAD (ADMIN) =================
-app.post("/files/upload", upload.single("file"), async (req, res) => {
-  try {
-    console.log("FILE =", req.file)
-    console.log("BODY =", req.body)
 
-    if (!req.file) {
-      return res.status(400).json({ error: "File missing" })
-    }
-
-    await File.create({
-      title: req.body.title,
-      className: req.body.className,
-      fileUrl: req.file.path   // 👈 cloudinary URL
-    })
-
-    res.json({ success: true })
-  } catch (err) {
-    console.error("UPLOAD ERROR:", err)
-    res.status(500).json({ success: false })
-  }
-})
 
 
 
