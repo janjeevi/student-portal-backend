@@ -5,25 +5,10 @@ require("dotenv").config()
 const express = require("express")
 const mongoose = require("mongoose")
 const cors = require("cors")
-const path = require("path")
-const cloudinary = require("cloudinary").v2
-const multer = require("multer")
-const { CloudinaryStorage } = require("multer-storage-cloudinary")
+const upload = require("./middleware/upload")
 
 // ================= CLOUDINARY =================
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true
-})
 
-console.log(
-  "CLOUDINARY =",
-  process.env.CLOUDINARY_CLOUD_NAME,
-  process.env.CLOUDINARY_API_KEY ? "KEY_OK" : "KEY_MISSING",
-  process.env.CLOUDINARY_API_SECRET ? "SECRET_OK" : "SECRET_MISSING"
-)
 
 // ================= APP =================
 const app = express()
@@ -45,6 +30,8 @@ app.use(express.json())
 
 
 console.log("🔥 server.js loaded")
+
+mongoose.connect(process.env.MONGO_URI)
 
 // ================= MONGO CONNECT =================
 console.log("MONGO_URI =", process.env.MONGO_URI)
@@ -157,19 +144,6 @@ const File = mongoose.model(
     fileUrl: String
   })
 )
-
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "student-portal-files",
-    resource_type: "auto"
-  }
-})
-
-const upload = multer({ storage: multer.memoryStorage() })
-
-
-
 
 
 
@@ -351,10 +325,7 @@ app.post("/files/upload", upload.single("file"), async (req, res) => {
       return res.status(400).json({ success: false })
     }
 
-    const uploadResult = await cloudinary.uploader.upload(
-      `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
-      { folder: "student-portal" }
-    )
+   
 
     await File.create({
       title: req.body.title,
@@ -377,8 +348,7 @@ app.get("/files/student", async (req, res) => {
   const { regNo } = req.query
 
   if (regNo === "ADMIN") {
-    const files = await File.find()
-    return res.json(files)
+    return res.json(await File.find())
   }
 
   const student = await Student.findOne({ regNo })
@@ -393,6 +363,8 @@ app.get("/files/student", async (req, res) => {
 
   res.json(files)
 })
+
+
 
 // ================= STUDENT REPORT =================
 app.get("/student/report", async (req, res) => {
@@ -460,5 +432,9 @@ app.get("/marks/student", async (req, res) => {
   res.json(marks)
 })
 
-
+// ================= START =================
+const PORT = process.env.PORT || 10000
+app.listen(PORT, () =>
+  console.log("🚀 Server running on port", PORT)
+)
 
