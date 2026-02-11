@@ -5,14 +5,9 @@ require("dotenv").config()
 const express = require("express")
 const mongoose = require("mongoose")
 const cors = require("cors")
-const upload = require("./middleware/upload")
-const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const cloudinary = require("../utils/cloudinary");
-
-
-// ================= CLOUDINARY =================
-
+const multer = require("multer")
+const { CloudinaryStorage } = require("multer-storage-cloudinary")
+const cloudinary = require("./utils/cloudinary") // ONLY ONCE HERE
 
 // ================= APP =================
 const app = express()
@@ -21,7 +16,8 @@ const app = express()
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    "https://student-portal-frontend-mu.vercel.app"
+    "https://student-portal-frontend-mu.vercel.app",
+    "https://student-portal-frontend.vercel.app"
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -29,18 +25,19 @@ app.use(cors({
 }))
 
 app.options("*", cors())
-
-app.use(express.json())
-
+app.use(express.json({limit: "30mb"}))
 
 console.log("🔥 server.js loaded")
-
-mongoose.connect(process.env.MONGO_URI)
 
 // ================= MONGO CONNECT =================
 console.log("MONGO_URI =", process.env.MONGO_URI)
 
-// ================= MODELS (AFTER mongoose require) =================
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ Mongo connected"))
+  .catch(err => console.log("❌ Mongo error", err))
+
+// ================= MODELS =================
 const Student = mongoose.model(
   "Student",
   new mongoose.Schema({
@@ -50,49 +47,6 @@ const Student = mongoose.model(
     password: String
   })
 )
-
-// ================= TEST =================
-app.get("/ping", (req, res) => {
-  console.log("Ping hit")
-  res.send("PONG")
-})
-
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ Mongo connected"))
-  .catch(err => console.log("❌ Mongo error", err))
-
-// ================= LOGIN =================
-app.post("/login", async (req, res) => {
-  const { username, password } = req.body
-
-  // ADMIN
-  if (username === "admin" && password === "admin123") {
-    return res.json({ success: true, role: "admin" })
-  }
-
-  // STUDENT
-  const student = await Student.findOne({
-    regNo: username,
-    password
-  })
-
-  if (!student) {
-    return res.json({ success: false })
-  }
-
-  res.json({
-    success: true,
-    role: "student",
-    regNo: student.regNo,
-    className: student.className,
-    name: student.name
-  })
-})
-
-// ================= START SERVER =================
-
-
 
 const Attendance = mongoose.model(
   "Attendance",
@@ -122,7 +76,7 @@ const Event = mongoose.model(
     title: String,
     description: String,
     date: String,
-    className: String // "1-A", "5-B", "ALL"
+    className: String
   })
 )
 
@@ -140,20 +94,20 @@ const Mark = mongoose.model(
   })
 )
 
-const File = mongoose.model(
-  "File",
-  new mongoose.Schema({
-    title: String,
-    className: String,
-    fileUrl: String
-  })
-)
+// File Model
+const fileSchema = new mongoose.Schema({
+  title: String,
+  className: String,
+  fileUrl: String,
+  originalName: String,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+})
+const File = mongoose.model("File", fileSchema)
 
-
-const cloudinary = require("cloudinary").v2
-const multer = require("multer")
-const { CloudinaryStorage } = require("multer-storage-cloudinary")
-
+// ================= CLOUDINARY STORAGE =================
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
@@ -164,10 +118,9 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage })
 
-
-
 // ================= TEST =================
 app.get("/ping", (req, res) => {
+  console.log("Ping hit")
   res.send("PONG")
 })
 
@@ -220,7 +173,6 @@ app.get("/students", async (req, res) => {
   res.json(students)
 })
 
-
 // ================= ATTENDANCE =================
 app.post("/attendance", async (req, res) => {
   await Attendance.insertMany(req.body)
@@ -234,8 +186,6 @@ app.get("/attendance/student", async (req, res) => {
 })
 
 // ================= FEES =================
-
-// ---- Upload Class Fees (ADMIN) ----
 app.post("/fees/class", async (req, res) => {
   const { className, totalFees } = req.body
 
@@ -269,7 +219,6 @@ app.post("/fees/class", async (req, res) => {
   res.json({ success: true })
 })
 
-// ---- Pay Fees (ADMIN) ----
 app.post("/fees/pay", async (req, res) => {
   const { regNo, className, amount } = req.body
 
@@ -298,7 +247,6 @@ app.post("/fees/pay", async (req, res) => {
   res.json({ success: true })
 })
 
-// ---- Student View Fees ----
 app.get("/fees/student", async (req, res) => {
   const { regNo } = req.query
   const fees = await Fees.findOne({ regNo })
@@ -306,8 +254,6 @@ app.get("/fees/student", async (req, res) => {
 })
 
 // ================= EVENTS =================
-
-// Upload Event (ADMIN)
 app.post("/events", async (req, res) => {
   const { title, description, date, className } = req.body
 
@@ -319,7 +265,6 @@ app.post("/events", async (req, res) => {
   res.json({ success: true })
 })
 
-// Get Events (Student + Admin)
 app.get("/events", async (req, res) => {
   const { className } = req.query
   let events = []
@@ -335,12 +280,87 @@ app.get("/events", async (req, res) => {
   res.json(events)
 })
 
-// ================= FILE UPLOAD (ADMIN) =================
+// ================= FILE UPLOAD =================
+// app.post("/files/upload", upload.single("file"), async (req, res) => {
+//   try {
+//     const newFile = new File({
+//       title: req.body.title,
+//       className: req.body.className,
+//       fileUrl: req.file.path,
+//       originalName: req.file.originalname
+//     })
 
+//     await newFile.save()
+//     res.json({ success: true })
+//   } catch (err) {
+//     console.error("Upload error:", err)
+//     res.status(500).json({ success: false, error: err.message })
+//   }
+// })
+// ================= FILE UPLOAD =================
+// ================= FILE UPLOAD =================
+app.post("/files/upload", upload.single("file"), async (req, res) => {
+  try {
+    console.log("📤 File upload request received")
+    console.log("📁 File:", req.file ? "Present" : "Missing")
+    console.log("📝 Title:", req.body.title)
+    console.log("📝 Class:", req.body.className)
 
+    // Check if file exists
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "No file uploaded" 
+      })
+    }
 
+    // Check required fields
+    if (!req.body.title || !req.body.className) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Title and className are required" 
+      })
+    }
 
+    console.log("🔗 Cloudinary URL:", req.file.path)
+    console.log("📄 Original name:", req.file.originalname)
 
+    // Create file record
+    const newFile = new File({
+      title: req.body.title,
+      className: req.body.className,
+      fileUrl: req.file.path,
+      originalName: req.file.originalname
+    })
+
+    // Save to database
+    await newFile.save()
+    
+    console.log("✅ File saved to database with ID:", newFile._id)
+    
+    res.json({ 
+      success: true, 
+      message: "File uploaded successfully",
+      file: {
+        id: newFile._id,
+        title: newFile.title,
+        url: newFile.fileUrl,
+        className: newFile.className
+      }
+    })
+    
+  } catch (err) {
+    console.error("❌ UPLOAD ERROR DETAILS:")
+    console.error("Error message:", err.message)
+    console.error("Error stack:", err.stack)
+    
+    res.status(500).json({ 
+      success: false, 
+      error: "Internal server error",
+      details: err.message 
+    })
+  }
+})
 // ================= STUDENT FILES =================
 app.get("/files/student", async (req, res) => {
   const { regNo } = req.query
@@ -362,8 +382,6 @@ app.get("/files/student", async (req, res) => {
   res.json(files)
 })
 
-
-
 // ================= STUDENT REPORT =================
 app.get("/student/report", async (req, res) => {
   const { regNo } = req.query
@@ -371,7 +389,6 @@ app.get("/student/report", async (req, res) => {
   const student = await Student.findOne({ regNo })
   if (!student) return res.json(null)
 
-  // Attendance
   const attendanceRecords = await Attendance.find({ regNo })
   const totalDays = attendanceRecords.length
   const presentDays = attendanceRecords.filter(
@@ -380,10 +397,7 @@ app.get("/student/report", async (req, res) => {
   const percentage =
     totalDays === 0 ? 0 : Math.round((presentDays / totalDays) * 100)
 
-  // Marks
   const marks = await Mark.find({ regNo })
-
-  // Fees
   const fees = await Fees.findOne({ regNo })
 
   res.json({
@@ -398,8 +412,7 @@ app.get("/student/report", async (req, res) => {
   })
 })
 
-
-// ================= UPLOAD MARKS (ADMIN) =================
+// ================= MARKS =================
 app.post("/marks", async (req, res) => {
   const records = req.body
 
@@ -423,11 +436,30 @@ app.post("/marks", async (req, res) => {
   res.json({ success: true })
 })
 
-// ================= STUDENT VIEW MARKS =================
 app.get("/marks/student", async (req, res) => {
   const { regNo } = req.query
   const marks = await Mark.find({ regNo })
   res.json(marks)
+})
+// ================= GLOBAL ERROR HANDLER =================
+app.use((err, req, res, next) => {
+  console.error("🔥 GLOBAL ERROR HANDLER:")
+  console.error(err.stack)
+  
+  // If it's a multer error
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({
+      success: false,
+      error: `Multer error: ${err.message}`
+    })
+  }
+  
+  // Generic error
+  res.status(500).json({
+    success: false,
+    error: "Internal server error",
+    message: err.message
+  })
 })
 
 // ================= START =================
@@ -435,4 +467,3 @@ const PORT = process.env.PORT || 10000
 app.listen(PORT, () =>
   console.log("🚀 Server running on port", PORT)
 )
-
